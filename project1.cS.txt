@@ -1,0 +1,505 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <stdbool.h>
+
+#define MAX_QUESTIONS 50
+#define MAX_PARTICIPANTS 100
+#define MAX_STRING 500
+#define TIMER_DURATION 20  // Timer duration in seconds
+
+// Fixed prize amounts (non-cumulative) for questions 1 to 5.
+int prizes[6] = {0, 50000, 100000, 250000, 500000, 1000000};
+
+// Structure for a question
+typedef struct {
+    char type[MAX_STRING];         // Question category (e.g., "English", "Math", etc.)
+    int difficulty;                // Difficulty level (1 to 5)
+    char question[MAX_STRING];     // The actual question text
+    char options[4][MAX_STRING];   // Array to hold the four options
+    char correctAnswer;            // Correct answer (e.g., 'A', 'B', 'C', or 'D')
+} Question;
+
+// Structure for a participant
+typedef struct {
+    char name[MAX_STRING];
+    char birthdate[MAX_STRING];    // Format: DD/MM/YYYY
+    char phone[MAX_STRING];
+    char address[MAX_STRING];      // We assume this stores the city.
+    int score;                     // Final winnings (equal to one of the prize values)
+} Participant;
+
+// Structure to track overall category performance.
+typedef struct {
+    char category[MAX_STRING];
+    int correct;
+    int incorrect;
+} CategoryStats;
+
+// Global array for category statistics and its count.
+CategoryStats globalStats[MAX_QUESTIONS];
+int globalStatsCount = 0;
+
+// Global variable to indicate if time is up
+bool time_up = false;
+
+// Function prototypes
+void show_menu();
+void load_questions(Question questions[], int *question_count, char question_file[]);
+void load_participants(Participant participants[], int *participant_count, char participant_file[]);
+void play_game(Question questions[], int question_count, Participant participants[], int *participant_count, char participant_file[]);
+void show_statistics(Participant participants[], int participant_count);
+void save_participant(Participant p, char participant_file[]);
+void *timer_thread(void *arg);
+void print_question_stats(Question questions[], int question_count);
+void update_global_category_stats(const char *category, bool correct);
+
+void print_question_stats(Question questions[], int question_count) {
+    char categories[MAX_QUESTIONS][MAX_STRING];
+    int cat_counts[MAX_QUESTIONS] = {0};
+    int cat_count = 0;
+    int difficulty_counts[10] = {0};  // index 0 unused
+
+    for (int i = 0; i < question_count; i++) {
+        int found = 0;
+        for (int j = 0; j < cat_count; j++) {
+            if (strcmp(categories[j], questions[i].type) == 0) {
+                cat_counts[j]++;
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            strcpy(categories[cat_count], questions[i].type);
+            cat_counts[cat_count] = 1;
+            cat_count++;
+        }
+        int diff = questions[i].difficulty;
+        if (diff >= 1 && diff < 10)
+            difficulty_counts[diff]++;
+    }
+    
+    printf("\n=== Question Category Statistics ===\n");
+    for (int i = 0; i < cat_count; i++) {
+        printf("Category '%s': %d question(s)\n", categories[i], cat_counts[i]);
+    }
+    
+    printf("\n=== Question Difficulty Statistics ===\n");
+    for (int d = 1; d < 10; d++) {
+        if (difficulty_counts[d] > 0) {
+            printf("Difficulty %d: %d question(s)\n", d, difficulty_counts[d]);
+        }
+    }
+}
+
+void show_menu() {
+    Question questions[MAX_QUESTIONS];
+    Participant participants[MAX_PARTICIPANTS];
+    int question_count = 0, participant_count = 0;
+    char question_file[MAX_STRING];
+    char participant_file[MAX_STRING];
+    int choice;
+
+    while (1) {
+        printf("\n===== Who Wants to Be a Millionaire? =====\n");
+        printf("1. Load Questions\n");
+        printf("2. Load Participants\n");
+        printf("3. Start Game\n");
+        printf("4. Show Statistics\n");
+        printf("5. Exit\n");
+        printf("Enter your choice: ");
+
+        if (scanf("%d", &choice) != 1) {
+            printf("Invalid input. Try again.\n");
+            while (getchar() != '\n');
+            continue;
+        }
+        getchar(); // Consume newline
+
+        switch (choice) {
+            case 1:
+                printf("Enter question file name: ");
+                fgets(question_file, MAX_STRING, stdin);
+                question_file[strcspn(question_file, "\n")] = 0;
+                load_questions(questions, &question_count, question_file);
+                print_question_stats(questions, question_count);
+                break;
+            case 2:
+                printf("Enter participant file name: ");
+                fgets(participant_file, MAX_STRING, stdin);
+                participant_file[strcspn(participant_file, "\n")] = 0;
+                load_participants(participants, &participant_count, participant_file);
+                printf("Loaded %d participants.\n", participant_count);
+                break;
+            case 3:
+                play_game(questions, question_count, participants, &participant_count, participant_file);
+                break;
+            case 4:
+                show_statistics(participants, participant_count);
+                break;
+            case 5:
+                printf("Exiting...\n");
+                return;
+            default:
+                printf("Invalid choice. Try again.\n");
+        }
+    }
+}
+
+void load_participants(Participant participants[], int *participant_count, char participant_file[]) {
+    FILE *file = fopen(participant_file, "r");
+    if (!file) {
+        printf("No participant data found. A new file will be created.\n");
+        return;
+    }
+    *participant_count = 0;
+    char line[MAX_STRING * 2];
+    while (*participant_count < MAX_PARTICIPANTS && fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = 0;
+        if (strlen(line) < 5) continue;
+        Participant *p = &participants[*participant_count];
+        int count = sscanf(line, "\"%[^\"]\" \"%[^\"]\" \"%[^\"]\" \"%[^\"]\" %d",
+                           p->name, p->birthdate, p->phone, p->address, &p->score);
+        if (count == 5) {
+            (*participant_count)++;
+        } else {
+            printf("Failed to parse line: %s\n", line);
+        }
+    }
+    fclose(file);
+    printf("Participants loaded successfully! Total: %d\n", *participant_count);
+}
+
+void load_questions(Question questions[], int *question_count, char question_file[]) {
+    FILE *file = fopen(question_file, "r");
+    if (!file) {
+        printf("No question data found. A new file will be created.\n");
+        return;
+    }
+    *question_count = 0;
+    char line[MAX_STRING * 4];
+    while (*question_count < MAX_QUESTIONS && fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = 0;
+        if (strlen(line) < 5) continue;
+        Question *q = &questions[*question_count];
+        int offset = 0;
+        if (sscanf(line, "%s %d %n", q->type, &q->difficulty, &offset) != 2) {
+            printf("Failed to parse type and difficulty: %s\n", line);
+            continue;
+        }
+        char *rest = line + offset;
+        char *firstQuote = strchr(rest, '\"');
+        if (firstQuote == NULL) {
+            printf("Failed to find options in line: %s\n", line);
+            continue;
+        }
+        int qTextLength = firstQuote - rest;
+        strncpy(q->question, rest, qTextLength);
+        q->question[qTextLength] = '\0';
+        for (int i = qTextLength - 1; i >= 0; i--) {
+            if (isspace(q->question[i]))
+                q->question[i] = '\0';
+            else
+                break;
+        }
+        int scanCount = sscanf(firstQuote,
+            " \"%[^\"]\" \"%[^\"]\" \"%[^\"]\" \"%[^\"]\" %c",
+            q->options[0], q->options[1], q->options[2], q->options[3], &q->correctAnswer);
+        if (scanCount != 5) {
+            printf("Failed to parse options and correct answer in line: %s\n", line);
+            continue;
+        }
+        (*question_count)++;
+    }
+    fclose(file);
+    printf("Questions loaded successfully! Total: %d\n", *question_count);
+}
+
+void update_global_category_stats(const char *category, bool correct) {
+    for (int i = 0; i < globalStatsCount; i++) {
+        if (strcmp(globalStats[i].category, category) == 0) {
+            if (correct)
+                globalStats[i].correct++;
+            else
+                globalStats[i].incorrect++;
+            return;
+        }
+    }
+    strcpy(globalStats[globalStatsCount].category, category);
+    globalStats[globalStatsCount].correct = correct ? 1 : 0;
+    globalStats[globalStatsCount].incorrect = correct ? 0 : 1;
+    globalStatsCount++;
+}
+
+void play_game(Question questions[], int question_count, Participant participants[], int *participant_count, char participant_file[]) {
+    if (question_count == 0) {
+        printf("No questions loaded. Please check the file.\n");
+        return;
+    }
+    
+    Participant new_participant;
+    printf("\nEnter your details to start the game:\n");
+    printf("Name: ");
+    fgets(new_participant.name, MAX_STRING, stdin);
+    new_participant.name[strcspn(new_participant.name, "\n")] = 0;
+    
+    printf("Birthdate (DD/MM/YYYY): ");
+    fgets(new_participant.birthdate, MAX_STRING, stdin);
+    new_participant.birthdate[strcspn(new_participant.birthdate, "\n")] = 0;
+    
+    printf("Phone: ");
+    fgets(new_participant.phone, MAX_STRING, stdin);
+    new_participant.phone[strcspn(new_participant.phone, "\n")] = 0;
+    
+    printf("City: ");
+    fgets(new_participant.address, MAX_STRING, stdin);
+    new_participant.address[strcspn(new_participant.address, "\n")] = 0;
+    
+    int winnings = 0;
+    srand(time(NULL));
+    
+    // Loop for 5 questions, with increasing difficulty from 1 to 5.
+    for (int diff = 1; diff <= 5; diff++) {
+        char desired_category[MAX_STRING];
+        Question *selected_question = NULL;
+        
+        // Display available categories for this difficulty.
+        printf("\nAvailable categories for difficulty level %d:\n", diff);
+        char available_categories[MAX_QUESTIONS][MAX_STRING];
+        int available_count = 0;
+        for (int i = 0; i < question_count; i++) {
+            if (questions[i].difficulty == diff) {
+                int found = 0;
+                for (int j = 0; j < available_count; j++) {
+                    if (strcmp(available_categories[j], questions[i].type) == 0) {
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found) {
+                    strcpy(available_categories[available_count], questions[i].type);
+                    available_count++;
+                }
+            }
+        }
+        if (available_count == 0) {
+            printf("No available questions for difficulty level %d. Skipping this level.\n", diff);
+            continue;
+        }
+        for (int j = 0; j < available_count; j++) {
+            printf(" - %s\n", available_categories[j]);
+        }
+        
+        // Ask user to choose a category for this difficulty.
+        while (selected_question == NULL) {
+            printf("\nFor difficulty level %d, choose a question category: ", diff);
+            fgets(desired_category, MAX_STRING, stdin);
+            desired_category[strcspn(desired_category, "\n")] = 0;
+            
+            int matching_indices[MAX_QUESTIONS];
+            int match_count = 0;
+            for (int i = 0; i < question_count; i++) {
+                if (questions[i].difficulty == diff && strcmp(questions[i].type, desired_category) == 0) {
+                    matching_indices[match_count++] = i;
+                }
+            }
+            if (match_count == 0) {
+                printf("No question found for category '%s' at difficulty %d. Please choose a different category.\n", desired_category, diff);
+            } else {
+                int random_index = matching_indices[rand() % match_count];
+                selected_question = &questions[random_index];
+            }
+        }
+        
+        // Announce the prize for this question.
+        printf("\nThis question is worth $%d.\n", prizes[diff]);
+        
+        // Option to stop before attempting the question.
+        char choice;
+        printf("\nDo you want to (C)ontinue and answer this question or (S)top and take your current winnings of $%d? ", winnings);
+        scanf(" %c", &choice);
+        getchar(); // Consume newline
+        if (toupper(choice) == 'S') {
+            printf("You have chosen to stop. Your winnings are $%d.\n", winnings);
+            goto end_game;
+        }
+        
+        // Display the question and answer options.
+        printf("\nDifficulty Level %d - Category: %s\n", diff, selected_question->type);
+        printf("Question: %s\n", selected_question->question);
+        for (int i = 0; i < 4; i++) {
+            printf("  %c) %s\n", 'A' + i, selected_question->options[i]);
+        }
+        
+        // Set up timer thread.
+        pthread_t timer;
+        time_up = false;
+        int timer_duration = TIMER_DURATION;
+        pthread_create(&timer, NULL, timer_thread, &timer_duration);
+        
+        char answer;
+        bool answeredCorrectly = false;
+        printf("\nYour answer (A, B, C, D): ");
+        scanf(" %c", &answer);
+        getchar(); // Consume newline
+        if (toupper(answer) == toupper(selected_question->correctAnswer))
+            answeredCorrectly = true;
+        
+        time_up = true;
+        pthread_join(timer, NULL);
+        
+        if (answeredCorrectly) {
+            printf("Correct! You win $%d for this question.\n", prizes[diff]);
+            winnings = prizes[diff];
+            update_global_category_stats(selected_question->type, true);
+        } else {
+            printf("Wrong! The correct answer was %c\n", toupper(selected_question->correctAnswer));
+            printf("The correct answer: %s\n", selected_question->options[selected_question->correctAnswer - 'A']);
+            update_global_category_stats(selected_question->type, false);
+            if (diff == 1 || diff == 2)
+                winnings = 0;
+            else if (diff == 3 || diff == 4)
+                winnings = prizes[2];
+            else if (diff == 5)
+                winnings = prizes[4];
+            goto end_game;
+        }
+    }
+    
+end_game:
+    printf("\nGame over. You won $%d!\n", winnings);
+    new_participant.score = winnings;
+    save_participant(new_participant, participant_file);
+    load_participants(participants, participant_count, participant_file);
+}
+
+void *timer_thread(void *arg) {
+    int duration = *((int *)arg);
+    for (int i = duration; i > 0; i--) {
+        if (time_up) return NULL;
+        printf("%*s", 50, "");
+        printf("\r| Time left: %-3d seconds  |", i);
+        fflush(stdout);
+        sleep(1);
+    }
+    time_up = true;
+    printf("\nTime's up! Game over.\n");
+    exit(0);
+}
+
+void save_participant(Participant p, char participant_file[]) {
+    FILE *file = fopen(participant_file, "a");
+    if (!file) {
+        printf("Failed to save participant data.\n");
+        return;
+    }
+    fprintf(file, "\"%s\" \"%s\" \"%s\" \"%s\" %d\n", p.name, p.birthdate, p.phone, p.address, p.score);
+    fclose(file);
+    printf("Participant data saved successfully.\n");
+}
+
+void show_statistics(Participant participants[], int participant_count) {
+    if (participant_count == 0) {
+        printf("\nNo participant data available.\n");
+        return;
+    }
+    printf("\n=== Game Statistics ===\n");
+    printf("Total Participants: %d\n", participant_count);
+    
+    Participant *top_contestant = &participants[0];
+    for (int i = 1; i < participant_count; i++) {
+        if (participants[i].score > top_contestant->score)
+            top_contestant = &participants[i];
+    }
+    printf("Most Successful Contestant: %s with $%d\n", top_contestant->name, top_contestant->score);
+    
+    char best_category[MAX_STRING] = "";
+    char worst_category[MAX_STRING] = "";
+    int best_correct = 0, worst_incorrect = 0;
+    for (int i = 0; i < globalStatsCount; i++) {
+        if (globalStats[i].correct > best_correct) {
+            best_correct = globalStats[i].correct;
+            strcpy(best_category, globalStats[i].category);
+        }
+        if (globalStats[i].incorrect > worst_incorrect) {
+            worst_incorrect = globalStats[i].incorrect;
+            strcpy(worst_category, globalStats[i].category);
+        }
+    }
+    printf("Category with most correctly answered: %s (%d correct)\n", best_category, best_correct);
+    printf("Category with most badly answered: %s (%d incorrect)\n", worst_category, worst_incorrect);
+    
+    int age_groups[3] = {0};
+    int correct_sum[3] = {0};
+    for (int i = 0; i < participant_count; i++) {
+        int year = 0;
+        if (strlen(participants[i].birthdate) >= 10)
+            year = atoi(participants[i].birthdate + 6);
+        int age = 2025 - year;
+        int correct = 0;
+        if (participants[i].score == prizes[1]) correct = 1;
+        else if (participants[i].score == prizes[2]) correct = 2;
+        else if (participants[i].score == prizes[3]) correct = 3;
+        else if (participants[i].score == prizes[4]) correct = 4;
+        else if (participants[i].score == prizes[5]) correct = 5;
+        
+        if (age <= 30) {
+            age_groups[0]++;
+            correct_sum[0] += correct;
+        } else if (age <= 50) {
+            age_groups[1]++;
+            correct_sum[1] += correct;
+        } else {
+            age_groups[2]++;
+            correct_sum[2] += correct;
+        }
+    }
+    printf("\nAverage correct answers per age group:\n");
+    printf("Age <= 30: %.2f\n", age_groups[0] ? (double)correct_sum[0] / age_groups[0] : 0.0);
+    printf("30 < Age <= 50: %.2f\n", age_groups[1] ? (double)correct_sum[1] / age_groups[1] : 0.0);
+    printf("Age > 50: %.2f\n", age_groups[2] ? (double)correct_sum[2] / age_groups[2] : 0.0);
+    
+    char top_city[MAX_STRING] = "";
+    int top_city_count = 0;
+    char cities[MAX_PARTICIPANTS][MAX_STRING];
+    int city_counts[MAX_PARTICIPANTS] = {0};
+    int city_count = 0;
+    for (int i = 0; i < participant_count; i++) {
+        char city[MAX_STRING];
+        sscanf(participants[i].address, "%s", city);
+        int found = 0;
+        for (int j = 0; j < city_count; j++) {
+            if (strcmp(cities[j], city) == 0) {
+                city_counts[j]++;
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            strcpy(cities[city_count], city);
+            city_counts[city_count] = 1;
+            city_count++;
+        }
+    }
+    for (int i = 0; i < city_count; i++) {
+        if (city_counts[i] > top_city_count) {
+            top_city_count = city_counts[i];
+            strcpy(top_city, cities[i]);
+        }
+    }
+    printf("City with highest participants: %s (%d participants)\n", top_city, top_city_count);
+    
+    printf("\nAll participants:\n");
+    for (int i = 0; i < participant_count; i++) {
+        printf("%d. %s - $%d\n", i + 1, participants[i].name, participants[i].score);
+    }
+}
+
+int main() {
+    show_menu();
+    return 0;
+}
