@@ -1,0 +1,55 @@
+English 1 What is the synonym of 'happy'? "Glad" "Angry" "Sad" "Excited" A
+English 1 Which word is a noun? "Run" "Beautiful" "Table" "Quickly" C
+English 1 What is the plural of 'child'? "Childs" "Children" "Childes" "Childz" B
+English 1 Which sentence is correct? "He go to school" "He goes to school" "He going school" "He gone school" B
+English 1 Choose the correct spelling. "Recieve" "Receive" "Recive" "Receeve" B
+English 2 Who wrote 'Romeo and Juliet'? "Shakespeare" "Dickens" "Tolkien" "Austen" A
+English 2 What is the opposite of 'brave'? "Fearful" "Coward" "Weak" "Timid" B
+English 2 What does 'opaque' mean? "Transparent" "Not see-through" "Shiny" "Reflective" B
+English 2 Which sentence is grammatically correct? "She don’t like apples" "She doesn’t like apples" "She no like apples" "She not like apples" B
+English 2 What is the past tense of 'run'? "Run" "Runned" "Ran" "Running" C
+English 3 What is the meaning of 'ubiquitous'? "Rare" "Omnipresent" "Unique" "Hidden" B
+English 3 What does 'euphemism' mean? "A polite way to say something" "A rude statement" "A type of poem" "A type of grammar" A
+English 3 Who wrote '1984'? "Orwell" "Huxley" "Tolkien" "Shakespeare" A
+English 3 What is the antonym of 'benevolent'? "Generous" "Malicious" "Kind" "Compassionate" B
+English 3 What is the synonym of 'ephemeral'? "Eternal" "Temporary" "Beautiful" "Weak" B
+English 4 Who is the author of 'Pride and Prejudice'? "Austen" "Brontë" "Tolkien" "Shakespeare" A
+English 4 What does 'conundrum' mean? "A puzzle" "A disease" "A book" "A punishment" A
+English 4 Which word means 'friendly and sociable'? "Aloof" "Gregarious" "Reserved" "Solitary" B
+English 4 What is 'onomatopoeia'? "A sound word" "A metaphor" "A type of speech" "A poem style" A
+English 4 What is the meaning of 'elucidate'? "Confuse" "Explain" "Destroy" "Ignore" B
+English 5 Who wrote 'To Kill a Mockingbird'? "Lee" "Orwell" "Hemingway" "Fitzgerald" A
+English 5 What does 'lugubrious' mean? "Cheerful" "Mournful" "Fast" "Intelligent" B
+English 5 What is the meaning of 'parsimonious'? "Generous" "Stingy" "Wealthy" "Brave" B
+English 5 What does 'serendipity' mean? "Accidental good fortune" "A sad event" "A strong emotion" "A coincidence" A
+English 5 Who wrote 'The Great Gatsby'? "Fitzgerald" "Hemingway" "Joyce" "Orwell" A
+Math 1 What is 5+3? "6" "7" "8" "9" C
+Math 1 What is 10-4? "4" "5" "6" "7" C
+Math 1 What is 3x3? "6" "7" "8" "9" D
+Math 1 What is 12/4? "2" "3" "4" "5" B
+Math 1 What is the square of 2? "2" "3" "4" "5" C
+Math 2 What is 15x2? "25" "30" "35" "40" B
+Math 2 What is 100/10? "5" "10" "20" "50" B
+Math 2 What is 9 squared? "72" "81" "90" "99" B
+Math 2 What is the cube root of 27? "2" "3" "4" "5" B
+Math 2 What is 45+55? "80" "90" "100" "110" C
+Math 3 What is 144/12? "10" "11" "12" "13" C
+Math 3 What is 7x8? "42" "48" "52" "56" D
+Math 3 What is 3^4? "27" "64" "81" "256" C
+Math 3 What is 5!? "20" "60" "120" "240" C
+Math 3 What is log(100) in base 10? "1" "2" "3" "4" B
+Programming 1 What does HTML stand for? "HyperText Markup Language" "HyperTransfer Markup Language" "HyperText Machine Learning" "HyperTransfer Main Link" A
+Programming 1 Which language is used for web development? "C" "Java" "HTML" "Python" C
+Programming 1 Which symbol is used for a single-line comment in C? "//" "/*" "##" "--" A
+Programming 1 Which of these is a high-level language? "Assembly" "C++" "Machine Code" "Binary" B
+Programming 1 What does 'printf' do in C? "Takes input" "Prints output" "Allocates memory" "Creates a variable" B
+Programming 2 Which keyword is used to define a function in Python? "func" "def" "define" "function" B
+Programming 2 What is the output of '2 ** 3' in Python? "6" "8" "9" "16" B
+Programming 2 Which loop runs at least once? "For loop" "While loop" "Do-while loop" "If statement" C
+Programming 2 What does 'int main()' signify in C? "Start of program" "End of program" "A function call" "A variable" A
+Programming 2 Which operator is used for 'AND' in C? "&&" "||" "!" "==" A
+Programming 3 What is the output of 5%2 in C? "0" "1" "2" "3" B
+Programming 3 Which of these is a correct variable declaration in C? "int x;" "x int;" "int = x;" "var x;" A
+Programming 3 What is the full form of CSS? "Computer Style Sheet" "Cascading Style Sheet" "Creative Style Sheet" "Computer System Setup" B
+Programming 3 What is the use of 'return' in C? "To exit a loop" "To return a value from a function" "To print a value" "To create a function" B
+Programming 3 What is a pointer in C? "A variable that stores memory address" "A function" "A loop" "A special keyword" A
